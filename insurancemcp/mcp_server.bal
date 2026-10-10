@@ -23,7 +23,7 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
     remote function getPolicy(string username) returns PolicyResponse|string|error {
         UsernameRequest usernameRequest = {username: username};
         PolicyResponse|ErrorResponse result = check insuranceCustomerClient->post(
-            "/insurance/customer/policy", usernameRequest);
+            "/policy", usernameRequest);
         if result is PolicyResponse {
             return result;
         }
@@ -43,7 +43,7 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
     remote function getClaims(string username) returns Claim[]|string|error {
         UsernameRequest usernameRequest = {username: username};
         Claim[]|ErrorResponse result = check insuranceCustomerClient->post(
-            "/insurance/customer/claims", usernameRequest);
+            "/claims", usernameRequest);
         if result is Claim[] {
             return result;
         }
@@ -72,7 +72,7 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
             description: description
         };
         SuccessResponse|ErrorResponse result = check insuranceCustomerClient->post(
-            "/insurance/customer/claims/submit", submitRequest);
+            "/claims/submit", submitRequest);
         if result is SuccessResponse {
             string successMessage = result.message;
             return successMessage;
@@ -93,7 +93,7 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
         description: "List all insurance policies in the system. Returns full details of every policy including username, policy number, coverage, premium, dates, and status. Intended for agent/admin use."
     }
     remote function listAllPolicies() returns InsurancePolicy[]|error {
-        InsurancePolicy[] policies = check insuranceAgentClient->get("/insurance/agent/policies");
+        InsurancePolicy[] policies = check insuranceAgentClient->get("/policies");
         return policies;
     }
 
@@ -109,7 +109,7 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
     remote function updatePolicyStatus(string policyNumber, string status) returns string|error {
         PolicyUpdateRequest updateRequest = {policyNumber: policyNumber, status: status};
         SuccessResponse|ErrorResponse result = check insuranceAgentClient->post(
-            "/insurance/agent/policy/update", updateRequest);
+            "/policy/update", updateRequest);
         if result is SuccessResponse {
             string successMessage = result.message;
             return successMessage;
@@ -127,7 +127,7 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
         description: "Get all insurance claims across every policyholder, any status (PENDING, APPROVED, REJECTED). Returns claim ID, username, type, amount, description, submitted date, and status for every claim, with PENDING claims listed first. Intended for agent/admin use."
     }
     remote function getAllClaims() returns AgentClaim[]|error {
-        AgentClaim[] allClaims = check insuranceAgentClient->get("/insurance/agent/claims");
+        AgentClaim[] allClaims = check insuranceAgentClient->get("/claims");
         return allClaims;
     }
 
@@ -143,7 +143,7 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
     remote function updateClaim(string claimId, string status) returns string|error {
         ClaimUpdateRequest updateRequest = {claimId: claimId, status: status};
         SuccessResponse|ErrorResponse result = check insuranceAgentClient->post(
-            "/insurance/agent/claim/update", updateRequest);
+            "/claim/update", updateRequest);
         if result is SuccessResponse {
             string successMessage = result.message;
             return successMessage;
