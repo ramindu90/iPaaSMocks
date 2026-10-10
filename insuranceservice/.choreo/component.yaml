@@ -13,6 +13,7 @@ endpoints:
     type: REST
     networkVisibilities:
       - Public
+      - Project
     schemaFilePath: openapi/customer-api.yaml
   - name: insurance-agent-api
     displayName: Insurance Agent API
@@ -22,4 +23,5 @@ endpoints:
     type: REST
     networkVisibilities:
       - Public
+      - Project
     schemaFilePath: openapi/agent-api.yaml
