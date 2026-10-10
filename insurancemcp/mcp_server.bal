@@ -184,18 +184,15 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
         description: "Update the status of an insurance claim by its claim ID. Valid statuses: PENDING, APPROVED, REJECTED. Intended for agent/admin use."
     }
     remote function updateClaim(string claimId, string status) returns string|error {
-        foreach string username in claimsDatabase.keys() {
-            Claim[]? userClaims = claimsDatabase[username];
-            if userClaims is Claim[] {
-                foreach int i in 0 ..< userClaims.length() {
-                    if userClaims[i].claimId == claimId {
-                        userClaims[i].status = status;
-                        claimsDatabase[username] = userClaims;
-                        return "Claim " + claimId + " updated to status: " + status;
-                    }
-                }
-            }
+        ClaimUpdateRequest updateRequest = {claimId: claimId, status: status};
+        SuccessResponse|ErrorResponse result = check insuranceAgentClient->post(
+            "/insurance/agent/claim/update", updateRequest);
+        if result is SuccessResponse {
+            string successMessage = result.message;
+            return successMessage;
         }
-        return "Claim not found: " + claimId;
+        ErrorResponse errResponse = result;
+        string errMessage = errResponse.message;
+        return errMessage;
     }
 }
