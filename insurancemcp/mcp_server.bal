@@ -1,5 +1,4 @@
 import ballerina/mcp;
-import ballerina/time;
 
 // MCP server listener on port 8084
 @mcp:StreamableHttpServiceConfig {
@@ -22,20 +21,15 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
         description: "Get insurance policy details for a given username. Returns policy number, type, coverage amount, premium, dates, and status."
     }
     remote function getPolicy(string username) returns PolicyResponse|string|error {
-        InsurancePolicy? policy = policyDatabase[username];
-        if policy is () {
-            return "No policy found for username: " + username;
+        UsernameRequest usernameRequest = {username: username};
+        PolicyResponse|ErrorResponse result = check insuranceCustomerClient->post(
+            "/insurance/customer/policy", usernameRequest);
+        if result is PolicyResponse {
+            return result;
         }
-        return {
-            policyNumber: policy.policyNumber,
-            policyType: policy.policyType,
-            coverageAmount: policy.coverageAmount,
-            premiumAmount: policy.premiumAmount,
-            startDate: policy.startDate,
-            endDate: policy.endDate,
-            status: policy.status,
-            organization: policy?.organization
-        };
+        ErrorResponse errResponse = result;
+        string errMessage = errResponse.message;
+        return errMessage;
     }
 
     # Get all insurance claims submitted by a given username.
@@ -47,15 +41,15 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
         description: "Get all insurance claims submitted by a given username. Returns a list of claims with claim ID, type, amount, description, submitted date, and status."
     }
     remote function getClaims(string username) returns Claim[]|string|error {
-        InsurancePolicy? policy = policyDatabase[username];
-        if policy is () {
-            return "No policy found for username: " + username;
+        UsernameRequest usernameRequest = {username: username};
+        Claim[]|ErrorResponse result = check insuranceCustomerClient->post(
+            "/insurance/customer/claims", usernameRequest);
+        if result is Claim[] {
+            return result;
         }
-        Claim[]? userClaims = claimsDatabase[username];
-        if userClaims is () {
-            return [];
-        }
-        return userClaims;
+        ErrorResponse errResponse = result;
+        string errMessage = errResponse.message;
+        return errMessage;
     }
 
     # Submit a new insurance claim for a user.
@@ -71,35 +65,21 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
     }
     remote function submitClaim(string username, string claimType,
             decimal amount, string description) returns string|error {
-        InsurancePolicy? policy = policyDatabase[username];
-        if policy is () {
-            return "No policy found for username: " + username;
-        }
-        string policyStatus = policy.status;
-        if policyStatus != "ACTIVE" {
-            return "Cannot submit claim. Policy status is: " + policyStatus;
-        }
-
-        time:Utc currentTime = time:utcNow();
-        string claimId = "CLM-" + currentTime[0].toString();
-
-        Claim newClaim = {
-            claimId: claimId,
+        ClaimSubmitRequest submitRequest = {
+            username: username,
             claimType: claimType,
             amount: amount,
-            description: description,
-            submittedDate: time:utcToString(currentTime).substring(0, 10),
-            status: "PENDING"
+            description: description
         };
-
-        Claim[]? existingClaims = claimsDatabase[username];
-        if existingClaims is () {
-            claimsDatabase[username] = [newClaim];
-        } else {
-            existingClaims.push(newClaim);
+        SuccessResponse|ErrorResponse result = check insuranceCustomerClient->post(
+            "/insurance/customer/claims/submit", submitRequest);
+        if result is SuccessResponse {
+            string successMessage = result.message;
+            return successMessage;
         }
-
-        return "Claim " + claimId + " submitted successfully and is under review";
+        ErrorResponse errResponse = result;
+        string errMessage = errResponse.message;
+        return errMessage;
     }
 
     // ─── Agent Tools ──────────────────────────────────────────────────────────
@@ -113,7 +93,8 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
         description: "List all insurance policies in the system. Returns full details of every policy including username, policy number, coverage, premium, dates, and status. Intended for agent/admin use."
     }
     remote function listAllPolicies() returns InsurancePolicy[]|error {
-        return policyDatabase.toArray();
+        InsurancePolicy[] policies = check insuranceAgentClient->get("/insurance/agent/policies");
+        return policies;
     }
 
     # Update the status of an insurance policy by its policy number.
@@ -126,15 +107,16 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
         description: "Update the status of an insurance policy by its policy number. Valid statuses: ACTIVE, EXPIRED, SUSPENDED. Intended for agent/admin use."
     }
     remote function updatePolicyStatus(string policyNumber, string status) returns string|error {
-        foreach string username in policyDatabase.keys() {
-            InsurancePolicy? policy = policyDatabase[username];
-            if policy is InsurancePolicy && policy.policyNumber == policyNumber {
-                policy.status = status;
-                policyDatabase[username] = policy;
-                return "Policy " + policyNumber + " updated to status: " + status;
-            }
+        PolicyUpdateRequest updateRequest = {policyNumber: policyNumber, status: status};
+        SuccessResponse|ErrorResponse result = check insuranceAgentClient->post(
+            "/insurance/agent/policy/update", updateRequest);
+        if result is SuccessResponse {
+            string successMessage = result.message;
+            return successMessage;
         }
-        return "Policy not found: " + policyNumber;
+        ErrorResponse errResponse = result;
+        string errMessage = errResponse.message;
+        return errMessage;
     }
 
     # Get all insurance claims across every policyholder, any status.
@@ -145,33 +127,8 @@ service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
         description: "Get all insurance claims across every policyholder, any status (PENDING, APPROVED, REJECTED). Returns claim ID, username, type, amount, description, submitted date, and status for every claim, with PENDING claims listed first. Intended for agent/admin use."
     }
     remote function getAllClaims() returns AgentClaim[]|error {
-        AgentClaim[] pending = [];
-        AgentClaim[] others = [];
-        foreach string username in claimsDatabase.keys() {
-            Claim[]? userClaims = claimsDatabase[username];
-            if userClaims is Claim[] {
-                foreach Claim c in userClaims {
-                    AgentClaim agentClaim = {
-                        username: username,
-                        claimId: c.claimId,
-                        claimType: c.claimType,
-                        amount: c.amount,
-                        description: c.description,
-                        submittedDate: c.submittedDate,
-                        status: c.status
-                    };
-                    if c.status == "PENDING" {
-                        pending.push(agentClaim);
-                    } else {
-                        others.push(agentClaim);
-                    }
-                }
-            }
-        }
-        foreach AgentClaim ac in others {
-            pending.push(ac);
-        }
-        return pending;
+        AgentClaim[] allClaims = check insuranceAgentClient->get("/insurance/agent/claims");
+        return allClaims;
     }
 
     # Update the status of an insurance claim by its claim ID.
