@@ -2,7 +2,7 @@
 org = "ramindu"
 name = "insurancemcp"
 version = "0.1.0"
-distribution = "2201.13.4"
+distribution = "2201.13.6"
 title = "InsuranceMCP"
 
 # Same version the k8s mock_insurance_backend runs (mcp:StreamableHttpListener API).
