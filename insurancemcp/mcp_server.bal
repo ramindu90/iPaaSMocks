@@ -2,14 +2,14 @@ import ballerina/mcp;
 import ballerina/time;
 
 // MCP server listener on port 8084
-@mcp:ServiceConfig {
+@mcp:StreamableHttpServiceConfig {
     info: {
         name: "Insurance MCP Server",
         version: "1.0.0"
     },
     sessionMode: mcp:STATELESS
 }
-service mcp:Service /mcp on new mcp:StreamableHttpListener(8084) {
+service mcp:StreamableHttpService /mcp on new mcp:StreamableHttpListener(8084) {
 
     // ─── Customer Tools ───────────────────────────────────────────────────────
 
